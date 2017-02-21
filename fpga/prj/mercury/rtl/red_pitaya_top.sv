@@ -149,9 +149,9 @@ if (top_rst) dac_rst  <= 1'b1;
 else         dac_rst  <= top_rst;
 
 // PDM reset (active low)
-always_ff @(posedge pdm_clk, posedge top_rst)
-if (top_rst) pdm_rstn <= 1'b0;
-else         pdm_rstn <= ~top_rst;
+always_ff @(posedge pwm_clk, posedge top_rst)
+if (top_rst) pwm_rstn <= 1'b0;
+else         pwm_rstn <= ~top_rst;
 
 ////////////////////////////////////////////////////////////////////////////////
 // ADC IO
@@ -162,15 +162,15 @@ axi4_stream_if #(.DT (SBA_T)) str_adc [MNA-1:0] (.ACLK (adc_clk), .ARESETn (adc_
 
 generate
 for (genvar i=0; i<MNA; i++) begin: for_adc
-  SBA_T adc_dat_raw;
+  SBA_T adc_raw;
 
   // IO block registers should be used here
   // lowest 2 bits reserved for 16bit ADC
   always @(posedge adc_clk)
-  raw[i] <= adc_dat_i[i][16-1:2];
+  adc_raw <= adc_dat_i[i][16-1:2];
 
   // transform into 2's complement (negative slope)
-  assign str_adc[i].TDATA  = {adc_raw[i][$bits(SBA_T)-1], ~adc_raw[i][$bits(SBA_T)-2:0]};
+  assign str_adc[i].TDATA  = {adc_raw[$bits(SBA_T)-1], ~adc_raw[$bits(SBA_T)-2:0]};
   assign str_adc[i].TKEEP  = '1;
   assign str_adc[i].TLAST  = 1'b0;
   // TVALID is always active
@@ -192,19 +192,16 @@ assign adc_cdcs_o = 1'b1;
 ////////////////////////////////////////////////////////////////////////////////
 
 // DAC AXI4-Stream interface
-axi4_stream_if #(.DT (SBG_T)) str_adc [MNG-1:0] (.ACLK (adc_clk), .ARESETn (adc_rstn));
+axi4_stream_if #(.DT (SBG_T)) str_dac [MNG-1:0] (.ACLK (adc_clk), .ARESETn (adc_rstn));
 
 SBG_T [MNG-1:0] dac_raw;
 
 generate
-for (genvar i=0; i<MNA; i++) begin: for_dac
-  // output registers + signed to unsigned (also to negative slope)
-  assign dac_raw[i] = {str_dac[i].TDATA[0][$bits(SBG_T)-1], ~str_dac[i].TDATA[0][$bits(SBG_T)-2:0]};
-
+for (genvar i=0; i<MNG; i++) begin: for_dac
   // output registers + signed to unsigned (also to negative slope)
   always @(posedge dac_clk_1x)
   if (str_dac[i].TVALID & str_dac[i].TKEEP)
-      dac_dat[i] <= {asg_dat[i][14-1], ~asg_dat[i][14-2:0]};
+      dac_raw[i] = {str_dac[i].TDATA[0][$bits(SBG_T)-1], ~str_dac[i].TDATA[0][$bits(SBG_T)-2:0]};
 
   // TREADY is always active
   assign str_dac[i].TREADY = 1'b1;
@@ -222,8 +219,6 @@ ODDR oddr_dac_dat [14-1:0] (.Q(dac_dat_o), .D1(dac_raw[0]), .D2(dac_raw[1]), .C(
 ////////////////////////////////////////////////////////////////////////////////
 // local signals
 ////////////////////////////////////////////////////////////////////////////////
-
-axi4_stream_if #(.DT (SBG_T)) str_dac [MNG-1:0] (.ACLK (adc_clk), .ARESETn (adc_rstn));  // DAC
 
 // configuration
 logic                    digital_loop;
@@ -342,7 +337,7 @@ assign daisy_n_o = 1'bz;
 
 id #(.GITH (GITH)) id (
   // System bus
-  .sys_addr (sys[0])
+  .bus (sys[0])
 );
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -381,22 +376,28 @@ red_pitaya_scope_simple i_scope (
 //  DAC arbitrary signal generator
 ////////////////////////////////////////////////////////////////////////////////
 
-asg_top #(
-  .EN_LIN (1),
-  .DT (SBL_T),
-  .TN (1)
-) asg [MNG-1:0] (
-  // stream output
-  .sto       (str_dac),
-  // triggers
-  .trg_ext   ('0),
-  .trg_swo   (),
-  .trg_out   (),
-  // interrupts
-  .irq_trg   (),
-  .irq_stp   (),
-  // System bus
-  .bus       (sys[3:2])
-);
+generate
+for (genvar i=0; i<MNG; i++) begin: for_asg
+
+  asg_top #(
+    .EN_LIN (1),
+    .DT (SBG_T),
+    .TN (1)
+  ) asg (
+    // stream output
+    .sto       (str_dac[i]),
+    // triggers
+    .trg_ext   ('0),
+    .trg_swo   (),
+    .trg_out   (),
+    // interrupts
+    .irq_trg   (),
+    .irq_stp   (),
+    // System bus
+    .bus       (sys[2+i])
+  );
+
+end: for_asg
+endgenerate
 
 endmodule: red_pitaya_top
