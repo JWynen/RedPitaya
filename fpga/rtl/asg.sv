@@ -169,12 +169,13 @@ else            bus.ack <= bus.ren | bus.wen;
 
 assign bus.err = 1'b0;
 
-// stream read
+// stream read data
 always @(posedge sto.ACLK)
-begin 
-  if (sts_aen)  buf_raddr <= ptr_cur[CWF+:CWM];
-  if (sts_ren)  buf_rdata <= buf_mem[buf_raddr];
-end
+if (sts_ren)  buf_rdata <= buf_mem[buf_raddr];
+
+// stream read pointer
+always @(posedge sto.ACLK)
+if (sts_aen)  buf_raddr <= ptr_cur[CWF+:CWM];
 
 // valid signal used to enable memory read access
 always @(posedge sto.ACLK)
