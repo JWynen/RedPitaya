@@ -157,11 +157,19 @@ logic               sts_rdy;  // ready
 
 // CPU write access
 always @(posedge bus.clk)
-if (bus.wen)  buf_mem[bus.addr] <= bus.wdata;
+if (bus.wen) begin
+  for (int unsigned i=0; i<2; i++) begin
+    buf_mem[{bus.addr>>2,i[0]}] <= bus.wdata [16*i+:16];
+  end
+end
 
 // CPU read-back access
 always @(posedge bus.clk)
-if (bus.ren)  bus.rdata <= buf_mem[bus.addr];
+if (bus.ren) begin
+  for (int unsigned i=0; i<2; i++) begin
+    bus.rdata [16*i+:16] <= buf_mem [{bus.addr>>2,i[0]}];
+  end
+end
 
 // CPU control signals
 always_ff @(posedge bus.clk)
