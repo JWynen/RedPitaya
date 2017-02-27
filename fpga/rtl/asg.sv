@@ -166,8 +166,8 @@ for (int unsigned i=0; i<2; i++) begin
 //                  bus.rdata [16*i+:16] <= buf_mem [{bus.addr>>2,i[0]}];
 //    if (bus.wen)  buf_mem [{bus.addr>>2,i[0]}] <= bus.wdata [16*i+:16];
 //  end
-  if (bus.ren)  bus.rdata] <= buf_mem [bus.addr>>2];
-  if (bus.wen)  buf_mem [bus.addr>>2] <= bus.wdata [];
+  if (bus.ren)  bus.rdata <= buf_mem [bus.addr>>2];
+  if (bus.wen)  buf_mem [bus.addr>>2] <= bus.wdata;
 end
 
 // CPU control signals
