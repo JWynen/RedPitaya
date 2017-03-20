@@ -37,7 +37,7 @@ assign buf_wen = str.transf & (buf_waddr[0] | str.TLAST);
 
 assign buf_wdata[1*16+:16] = str.TDATA;
 
-always @(posedge bus.clk)
+always_ff @(posedge bus.clk)
 if (str.transf) buf_wdata[0*16+:16] <= str.TDATA;
 
 always_ff @(posedge str.ACLK)
